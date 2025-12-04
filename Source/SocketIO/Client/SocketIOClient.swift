@@ -77,6 +77,17 @@ open class SocketIOClient: NSObject, SocketIOClientSpec {
 
     /// The id of this socket.io connect. This is different from the sid of the engine.io connection.
     public private(set) var sid: String?
+    /// The id of this socket.io connect for connection state recovery.
+    public private(set) var pid: String? {
+        didSet {
+            recovered = pid == oldValue
+        }
+    }
+
+    /// Offset of last socket.io event for connection state recovery.
+    public private(set) var lastEventOffset: String?
+    /// Boolean setted after connection to know if socket state is recovered or not.
+    public private(set) var recovered: Bool = false
 
     let ackHandlers = SocketAckManager()
     var connectPayload: [String: Any]?
@@ -130,9 +141,11 @@ open class SocketIOClient: NSObject, SocketIOClientSpec {
             return
         }
 
+        let payloadWithConnectionStateRecovery = getConnectionStateRecoveryPayload(with: payload)
+
         status = .connecting
 
-        joinNamespace(withPayload: payload)
+        joinNamespace(withPayload: payloadWithConnectionStateRecovery)
 
         switch manager.version {
         case .three:
@@ -159,6 +172,14 @@ open class SocketIOClient: NSObject, SocketIOClientSpec {
         }
     }
 
+    func getConnectionStateRecoveryPayload(with payload: [String: Any]?) -> [String: Any]? {
+        guard let pid, let lastEventOffset else { return payload }
+        var recoveryPayload = payload ?? [:]
+        recoveryPayload["pid"] = pid
+        recoveryPayload["offset"] = lastEventOffset
+        return recoveryPayload
+    }
+
     func createOnAck(_ items: [Any], binary: Bool = true) -> OnAckCallback {
         currentAck += 1
 
@@ -175,6 +196,7 @@ open class SocketIOClient: NSObject, SocketIOClientSpec {
         DefaultSocketLogger.Logger.log("Socket connected", type: logType)
 
         status = .connected
+        pid = payload?["pid"] as? String
         sid = payload?["sid"] as? String
 
         handleClientEvent(.connect, data: payload == nil ? [namespace] : [namespace, payload!])
@@ -358,6 +380,11 @@ open class SocketIOClient: NSObject, SocketIOClientSpec {
     /// - parameter ack: If > 0 then this event expects to get an ack back from the client.
     open func handleEvent(_ event: String, data: [Any], isInternalMessage: Bool, withAck ack: Int = -1) {
         guard status == .connected || isInternalMessage else { return }
+
+        if let eventOffset = data.last as? String,
+           !isInternalMessage && ack < 0 && pid != nil {
+            self.lastEventOffset = eventOffset
+        }
 
         DefaultSocketLogger.Logger.log("Handling event: \(event) with data: \(data)", type: logType)
 
