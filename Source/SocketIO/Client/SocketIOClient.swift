@@ -80,7 +80,7 @@ open class SocketIOClient: NSObject, SocketIOClientSpec {
     /// The id of this socket.io connect for connection state recovery.
     public private(set) var pid: String? {
         didSet {
-            recovered = pid == oldValue
+            recovered = pid != nil && pid == oldValue
         }
     }
 
@@ -381,8 +381,8 @@ open class SocketIOClient: NSObject, SocketIOClientSpec {
     open func handleEvent(_ event: String, data: [Any], isInternalMessage: Bool, withAck ack: Int = -1) {
         guard status == .connected || isInternalMessage else { return }
 
-        if let eventOffset = data.last as? String,
-           !isInternalMessage && ack < 0 && pid != nil {
+        if !isInternalMessage && ack < 0 && pid != nil,
+           let eventOffset = data.last as? String {
             self.lastEventOffset = eventOffset
         }
 
