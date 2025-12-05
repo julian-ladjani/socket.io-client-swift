@@ -89,6 +89,9 @@ open class SocketIOClient: NSObject, SocketIOClientSpec {
     /// Boolean setted after connection to know if socket state is recovered or not.
     public private(set) var recovered: Bool = false
 
+    /// Array of events (or binary events) to handle when socket is connected and recover packets from server
+    public private(set) var savedEvents = [SocketPacket]()
+
     let ackHandlers = SocketAckManager()
     var connectPayload: [String: Any]?
 
@@ -193,13 +196,15 @@ open class SocketIOClient: NSObject, SocketIOClientSpec {
     open func didConnect(toNamespace namespace: String, payload: [String: Any]?) {
         guard status != .connected else { return }
 
-        DefaultSocketLogger.Logger.log("Socket connected", type: logType)
-
-        status = .connected
         pid = payload?["pid"] as? String
         sid = payload?["sid"] as? String
 
+        DefaultSocketLogger.Logger.log("Socket connected", type: logType)
+
+        status = .connected
+
         handleClientEvent(.connect, data: payload == nil ? [namespace] : [namespace, payload!])
+        handleSavedEventPackets()
     }
 
     /// Called when the client has disconnected from socket.io.
@@ -404,6 +409,7 @@ open class SocketIOClient: NSObject, SocketIOClientSpec {
 
         switch packet.type {
         case .event, .binaryEvent:
+            saveEventPacketIfNeeded(packet: packet, isInternalMessage: false)
             handleEvent(packet.event, data: packet.args, isInternalMessage: false, withAck: packet.id)
         case .ack, .binaryAck:
             handleAck(packet.id, data: packet.data)
@@ -413,6 +419,29 @@ open class SocketIOClient: NSObject, SocketIOClientSpec {
             didDisconnect(reason: "Got Disconnect")
         case .error:
             handleEvent("error", data: packet.data, isInternalMessage: true, withAck: packet.id)
+        }
+    }
+
+    /// Called when we get an event from socket.io
+    /// Save it to event array if an event is sent before socket is set to connected status.
+    /// Do not save event if pid is nil (cannot recover events from server)
+    ///
+    /// - parameter packet: The packet to handle.
+    /// - parameter isInternalMessage: Whether this event was sent internally. If `true` ignore it.
+    open func saveEventPacketIfNeeded(packet: SocketPacket, isInternalMessage: Bool) {
+        guard status != .connected && !isInternalMessage && pid != nil else { return }
+        savedEvents.append(packet)
+    }
+
+    /// Called when socket pass to connected state, handle events if socket recover data from server
+    open func handleSavedEventPackets() {
+        if recovered {
+            savedEvents.removeAll { packet in
+                handleEvent(packet.event, data: packet.args, isInternalMessage: false)
+                return true
+            }
+        } else {
+            savedEvents.removeAll()
         }
     }
 
