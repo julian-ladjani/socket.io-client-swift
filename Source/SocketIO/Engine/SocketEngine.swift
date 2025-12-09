@@ -335,6 +335,15 @@ open class SocketEngine: NSObject, WebSocketDelegate, URLSessionDelegate,
         }
     }
 
+    /// Force close engine.
+    ///
+    /// - parameter reason: The reason for the disconnection. This is communicated up to the client.
+    open func close(reason: String) {
+        guard connected && !closed else { return closeOutEngine(reason: reason) }
+        DefaultSocketLogger.Logger.log("Engine is being foce closed.", type: SocketEngine.logType)
+        closeOutEngine(reason: reason)
+    }
+
     private func _disconnect(reason: String) {
         guard connected && !closed else { return closeOutEngine(reason: reason) }
 
