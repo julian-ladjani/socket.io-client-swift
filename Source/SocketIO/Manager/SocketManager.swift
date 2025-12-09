@@ -242,6 +242,16 @@ open class SocketManager: NSObject, SocketManagerSpec, SocketParsable, SocketDat
         engine?.disconnect(reason: "Disconnect")
     }
 
+    /// Force disconnects the manager and all associated sockets.
+    open func close() {
+        DefaultSocketLogger.Logger.log("Manager closing", type: SocketManager.logType)
+
+        status = .disconnected
+
+        engine?.close(reason: "Disconnect")
+    }
+
+
     /// Disconnects the given socket.
     ///
     /// This will remove the socket for the manager's control, and make the socket instance useless and ready for
