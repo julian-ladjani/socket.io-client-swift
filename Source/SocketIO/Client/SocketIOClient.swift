@@ -78,11 +78,7 @@ open class SocketIOClient: NSObject, SocketIOClientSpec {
     /// The id of this socket.io connect. This is different from the sid of the engine.io connection.
     public private(set) var sid: String?
     /// The id of this socket.io connect for connection state recovery.
-    public private(set) var pid: String? {
-        didSet {
-            recovered = pid != nil && pid == oldValue
-        }
-    }
+    public private(set) var pid: String?
 
     /// Offset of last socket.io event for connection state recovery.
     public private(set) var lastEventOffset: String?
@@ -195,8 +191,9 @@ open class SocketIOClient: NSObject, SocketIOClientSpec {
     /// - parameter toNamespace: The namespace that was connected to.
     open func didConnect(toNamespace namespace: String, payload: [String: Any]?) {
         guard status != .connected else { return }
-
-        pid = payload?["pid"] as? String
+        let pid = payload?["pid"] as? String
+        recovered = self.pid != nil && self.pid == pid
+        self.pid = pid
         sid = payload?["sid"] as? String
 
         DefaultSocketLogger.Logger.log("Socket connected", type: logType)
@@ -386,17 +383,17 @@ open class SocketIOClient: NSObject, SocketIOClientSpec {
     open func handleEvent(_ event: String, data: [Any], isInternalMessage: Bool, withAck ack: Int = -1) {
         guard status == .connected || isInternalMessage else { return }
 
-        if !isInternalMessage && ack < 0 && pid != nil,
-           let eventOffset = data.last as? String {
-            self.lastEventOffset = eventOffset
-        }
-
         DefaultSocketLogger.Logger.log("Handling event: \(event) with data: \(data)", type: logType)
 
         anyHandler?(SocketAnyEvent(event: event, items: data))
 
         for handler in handlers where handler.event == event {
             handler.executeCallback(with: data, withAck: ack, withSocket: self)
+        }
+
+        if !isInternalMessage && ack < 0 && pid != nil,
+           let eventOffset = data.last as? String {
+            self.lastEventOffset = eventOffset
         }
     }
 
