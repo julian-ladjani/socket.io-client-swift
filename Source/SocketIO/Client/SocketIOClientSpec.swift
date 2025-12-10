@@ -56,6 +56,16 @@ public protocol SocketIOClientSpec : AnyObject {
 
     /// The id of this socket.io connect. This is different from the sid of the engine.io connection.
     var sid: String? { get }
+    /// The id of this socket.io connect for connection state recovery.
+    var pid: String? { get }
+
+    /// Offset of last socket.io event for connection state recovery.
+    var lastEventOffset: String? { get }
+    /// Boolean setted after connection to know if socket state is recovered or not.
+    var recovered: Bool { get }
+
+    /// Array of events (or binary events) to handle when socket is connected and recover packets from server
+    var savedEvents: [SocketPacket] { get }
 
     /// The status of this client.
     var status: SocketIOStatus { get }
@@ -191,6 +201,17 @@ public protocol SocketIOClientSpec : AnyObject {
     ///
     /// - parameter packet: The packet to handle.
     func handlePacket(_ packet: SocketPacket)
+
+    /// Called when we get an event from socket.io
+    /// Save it to event array if an event is sent before socket is set to connected status.
+    /// Do not save event if pid is nil (cannot recover events from server)
+    ///
+    /// - parameter packet: The packet to handle.
+    /// - parameter isInternalMessage: Whether this event was sent internally. If `true` ignore it.
+    func saveEventPacketIfNeeded(packet: SocketPacket, isInternalMessage: Bool)
+
+    /// Called when socket pass to connected state, handle events if socket recover data from server
+    func handleSavedEventPackets()
 
     /// Call when you wish to leave a namespace and disconnect this socket.
     func leaveNamespace()
