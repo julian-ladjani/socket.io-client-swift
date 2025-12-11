@@ -107,7 +107,7 @@ open class SocketManager: NSObject, SocketManagerSpec, SocketParsable, SocketDat
     public var randomizationFactor = 0.5
 
     /// The status of this manager.
-    public private(set) var status: SocketIOStatus = .notConnected {
+    public var status: SocketIOStatus = .notConnected {
         didSet {
             switch status {
             case .connected:

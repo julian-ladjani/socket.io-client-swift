@@ -172,10 +172,12 @@ open class SocketIOClient: NSObject, SocketIOClientSpec {
     }
 
     func getConnectionStateRecoveryPayload(with payload: [String: Any]?) -> [String: Any]? {
-        guard let pid, let lastEventOffset else { return payload }
+        guard let pid else { return payload }
         var recoveryPayload = payload ?? [:]
         recoveryPayload["pid"] = pid
-        recoveryPayload["offset"] = lastEventOffset
+        if let lastEventOffset {
+            recoveryPayload["offset"] = lastEventOffset
+        }
         return recoveryPayload
     }
 
