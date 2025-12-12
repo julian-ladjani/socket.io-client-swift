@@ -89,7 +89,16 @@ open class SocketIOClient: NSObject, SocketIOClientSpec {
     public private(set) var savedEvents = [SocketPacket]()
 
     let ackHandlers = SocketAckManager()
-    var connectPayload: [String: Any]?
+
+    private var _connectPayload: [String: Any]?
+    var connectPayload: [String: Any]? {
+        get {
+            getConnectionStateRecoveryPayload(with: _connectPayload)
+        }
+        set {
+            _connectPayload = newValue
+        }
+    }
 
     private(set) var currentAck = -1
 
@@ -140,11 +149,8 @@ open class SocketIOClient: NSObject, SocketIOClientSpec {
             return
         }
 
-        let payloadWithConnectionStateRecovery = getConnectionStateRecoveryPayload(with: payload)
-
         status = .connecting
-
-        joinNamespace(withPayload: payloadWithConnectionStateRecovery)
+        joinNamespace(withPayload: payload)
 
         switch manager.version {
         case .three:
@@ -202,8 +208,8 @@ open class SocketIOClient: NSObject, SocketIOClientSpec {
 
         status = .connected
 
-        handleClientEvent(.connect, data: payload == nil ? [namespace] : [namespace, payload!])
         handleSavedEventPackets()
+        handleClientEvent(.connect, data: payload == nil ? [namespace] : [namespace, payload!])
     }
 
     /// Called when the client has disconnected from socket.io.
