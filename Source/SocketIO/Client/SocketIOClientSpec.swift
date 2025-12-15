@@ -194,7 +194,8 @@ public protocol SocketIOClientSpec : AnyObject {
     /// - parameter data: The data that was sent with this event.
     /// - parameter isInternalMessage: Whether this event was sent internally. If `true` it is always sent to handlers.
     /// - parameter ack: If > 0 then this event expects to get an ack back from the client.
-    func handleEvent(_ event: String, data: [Any], isInternalMessage: Bool, withAck ack: Int)
+    /// - returns: true if event is handled, false if event need to be saved (not handled)
+    func handleEvent(_ event: String, data: [Any], isInternalMessage: Bool, withAck ack: Int) -> Bool
 
     /// Causes a client to handle a socket.io packet. The namespace for the packet must match the namespace of the
     /// socket.

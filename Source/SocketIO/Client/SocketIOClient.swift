@@ -388,8 +388,10 @@ open class SocketIOClient: NSObject, SocketIOClientSpec {
     /// - parameter data: The data that was sent with this event.
     /// - parameter isInternalMessage: Whether this event was sent internally. If `true` it is always sent to handlers.
     /// - parameter ack: If > 0 then this event expects to get an ack back from the client.
-    open func handleEvent(_ event: String, data: [Any], isInternalMessage: Bool, withAck ack: Int = -1) {
-        guard status == .connected || isInternalMessage else { return }
+    /// - returns: true if event is handled, false if event need to be saved (not handled)
+    @discardableResult
+    open func handleEvent(_ event: String, data: [Any], isInternalMessage: Bool, withAck ack: Int = -1) -> Bool {
+        guard status == .connected || isInternalMessage else { return false }
 
         DefaultSocketLogger.Logger.log("Handling event: \(event) with data: \(data)", type: logType)
 
@@ -403,6 +405,7 @@ open class SocketIOClient: NSObject, SocketIOClientSpec {
            let eventOffset = data.last as? String {
             self.lastEventOffset = eventOffset
         }
+        return true
     }
 
     /// Causes a client to handle a socket.io packet. The namespace for the packet must match the namespace of the
@@ -414,8 +417,9 @@ open class SocketIOClient: NSObject, SocketIOClientSpec {
 
         switch packet.type {
         case .event, .binaryEvent:
-            saveEventPacketIfNeeded(packet: packet, isInternalMessage: false)
-            handleEvent(packet.event, data: packet.args, isInternalMessage: false, withAck: packet.id)
+            if !handleEvent(packet.event, data: packet.args, isInternalMessage: false, withAck: packet.id) {
+                saveEventPacketIfNeeded(packet: packet, isInternalMessage: false)
+            }
         case .ack, .binaryAck:
             handleAck(packet.id, data: packet.data)
         case .connect:
@@ -434,7 +438,7 @@ open class SocketIOClient: NSObject, SocketIOClientSpec {
     /// - parameter packet: The packet to handle.
     /// - parameter isInternalMessage: Whether this event was sent internally. If `true` ignore it.
     open func saveEventPacketIfNeeded(packet: SocketPacket, isInternalMessage: Bool) {
-        guard status != .connected && !isInternalMessage && pid != nil else { return }
+        guard !isInternalMessage && pid != nil else { return }
         savedEvents.append(packet)
     }
 
@@ -442,8 +446,7 @@ open class SocketIOClient: NSObject, SocketIOClientSpec {
     open func handleSavedEventPackets() {
         if recovered {
             savedEvents.removeAll { packet in
-                handleEvent(packet.event, data: packet.args, isInternalMessage: false)
-                return true
+                return handleEvent(packet.event, data: packet.args, isInternalMessage: false)
             }
         } else {
             savedEvents.removeAll()
